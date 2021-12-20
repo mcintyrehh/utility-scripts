@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ "$1" == "-h" ]
+then
+    echo "
+Pass the path of the boot drive to be initiated
+in the form '$ ./raspi-zero-boot-init /d'
+
+If no path is specified the script will run in the current working directory"
+else
+
+cd "$1" || '.' && touch wpa_supplicant.conf ssh
+#Pipe the currently connected wireless interface to grep
+#Grep pipes the line containing 'SSID' to sed
+#Sed removes key to only leave SSID value
+ssid=`netsh wlan show interfaces | grep SSID -w | sed -n s/\ *SSID\ *:\ *//p`
+#Same idea as above for the password
+password=`netsh wlan show profile "$ssid" key=clear | grep "Key Content  \+:" | sed -n s/\ *Key\ Content\ *:\ *//p`
+
+# Set up WiFi configuration
+STR=$"ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=US
+
+network={
+    ssid=\"${ssid}\"
+    psk=${password}
+    scan_ssid=1
+}"
+echo "$STR" >>  wpa_supplicant.conf
+
+# Enable UART on GPIO header pins 
+# (allows USB console cable to be attached for troubleshooting)
+UART_STR=$'# Enable UART
+enable_uart=1'
+
+echo "$UART_STR" >> config.txt
+echo "Raspberry Pi headless setup complete!"
+fi
